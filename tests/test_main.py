@@ -126,8 +126,8 @@ def test_create_category():
     response = client.post(
         "/categories/",
         params={
-            "name": "Books",
-            "description": "Book category"
+            "name": "TestCategoryUnique",
+            "description": "Test category"
         }
     )
 
@@ -137,6 +137,8 @@ def test_create_category():
 
     assert data["status"] == "success"
     assert "id" in data
+
+
 
 
 def test_update_stock():
