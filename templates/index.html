@@ -1,19 +1,124 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>CI/CD Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD CRUD Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f4f4f9; }
-        table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-        th, td { padding: 12px; border: 1px solid #ddd; text-align: left; }
-        th { background: #007bff; color: white; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background: #f4f4f9;
+            color: #333;
+        }
+
+        header {
+            background: #007bff;
+            color: white;
+            padding: 25px 40px;
+        }
+
+        header h1 {
+            margin: 0 0 10px;
+        }
+
+        header p {
+            margin: 0;
+        }
+
+        main {
+            margin: 30px 40px;
+        }
+
+        .info {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            flex: 1;
+        }
+
+        .card h3 {
+            margin-top: 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background: #007bff;
+            color: white;
+        }
+
+        tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        .status {
+            color: #198754;
+            font-weight: bold;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 30px;
+        }
+
+        footer {
+            margin-top: 30px;
+            padding: 20px 40px;
+            background: #343a40;
+            color: white;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
-    <h1>Панель управления — версия 2</h1>
-    тест тест
-    <p>Статус: Приложение успешно собрано и развернуто через Jenkins!</p>
+
+<header>
+    <h1>Панель управления CI/CD CRUD</h1>
+    <p>FastAPI + SQLAlchemy + SQLite + Jenkins</p>
+</header>
+
+<main>
+
+    <div class="info">
+        <div class="card">
+            <h3>Статус приложения</h3>
+            <p class="status">Приложение работает</p>
+        </div>
+
+        <div class="card">
+            <h3>CI/CD</h3>
+            <p class="status">Сборка выполнена через Jenkins</p>
+        </div>
+
+        <div class="card">
+            <h3>База данных</h3>
+            <p>SQLite + SQLAlchemy</p>
+        </div>
+    </div>
+
+    <h2>Товары</h2>
+
     <table>
         <tr>
             <th>ID</th>
@@ -21,7 +126,9 @@
             <th>Категория</th>
             <th>Цена</th>
             <th>Остаток</th>
+            <th>Описание</th>
         </tr>
+
         {% for item in items %}
         <tr>
             <td>{{ item.id }}</td>
@@ -29,10 +136,22 @@
             <td>{{ item.category }}</td>
             <td>{{ item.price }}</td>
             <td>{{ item.stock }}</td>
+            <td>{{ item.description or "—" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="6" class="empty">
+                Товары отсутствуют
+            </td>
         </tr>
         {% endfor %}
-
-        ааа
     </table>
+
+</main>
+
+<footer>
+    Лабораторная работа №1 — Методология CI/CD
+</footer>
+
 </body>
 </html>
