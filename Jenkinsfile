@@ -3,8 +3,7 @@ pipeline {
 
     environment {
         PYTHON = 'C:\\Users\\perfi\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
-        DEPLOY_DIR = 'C:\\apps\\hjfjksd'
-        APP_PORT = '8000'
+        DEPLOY_DIR = 'C:\\apps'
     }
 
     stages {
@@ -44,43 +43,32 @@ pipeline {
                 bat '''
                     if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
 
-                    robocopy . "%DEPLOY_DIR%" /E /XD .git venv __pycache__ .pytest_cache /NFL /NDL /NJH /NJS /NC /NS
+                    robocopy . "%DEPLOY_DIR%" /E /XD .git venv __pycache__ .pytest_cache /XF app.db /NFL /NDL /NJH /NJS /NC /NS
 
                     if errorlevel 8 exit /b %ERRORLEVEL%
 
                     cd /d "%DEPLOY_DIR%"
 
-                    if not exist venv "%PYTHON%" -m venv venv
+                    if not exist venv (
+                        "%PYTHON%" -m venv venv
+                    )
 
                     venv\\Scripts\\python.exe -m pip install -r requirements.txt
 
-                    taskkill /F /FI "WINDOWTITLE eq FastAPIApp*" >nul 2>&1
+                    net stop FastAPI 2>nul
 
-                    start "FastAPIApp" /B "%DEPLOY_DIR%\\venv\\Scripts\\python.exe" -m uvicorn app.main:app --host 0.0.0.0 --port %APP_PORT%
+                    net start FastAPI
                 '''
-            }
-        }
-
-        stage('Инфо для веток разработки') {
-            when {
-                expression {
-                    !(env.GIT_BRANCH?.endsWith('main') ||
-                      env.GIT_BRANCH?.endsWith('master'))
-                }
-            }
-            steps {
-                echo "Ветка ${env.GIT_BRANCH}: деплой пропущен."
             }
         }
     }
 
     post {
         success {
-            echo "Успешно! Ветка: ${env.GIT_BRANCH}"
+            echo "Деплой успешно завершён"
         }
         failure {
-            echo "Ошибка! Ветка: ${env.GIT_BRANCH}"
+            echo "Сборка или деплой завершились ошибкой"
         }
     }
 }
-
