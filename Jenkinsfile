@@ -37,19 +37,16 @@ pipeline {
         }
         
         stage('Деплой') {
-            when { 
-                expression { env.GIT_BRANCH?.endsWith('main') || env.GIT_BRANCH?.endsWith('master') } 
-            }
             steps {
                 bat '''
                     echo "Копирование файлов в C:\\apps\\hjfjksd..."
                     if not exist C:\\apps\\hjfjksd mkdir C:\\apps\\hjfjksd
                     robocopy . C:\\apps\\hjfjksd /E /XD .git venv __pycache__ .pytest_cache /NFL /NDL /NJH /NJS /NC /NS
-
+                    
                     echo "Запуск приложения FastAPI..."
                     cd /d C:\\apps\\hjfjksd
-                    start /b venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-                    echo "Сервер запущен на http://127.0.0.1:8000"
+                    start "FastAPIApp" venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+                    echo "Сервер запущен!"
                 '''
             }
         }
