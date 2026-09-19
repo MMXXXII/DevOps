@@ -19,9 +19,10 @@ pipeline {
                     echo "Создание venv в workspace Jenkins..."
                     if exist venv rmdir /s /q venv
                     "%PYTHON%" -m venv venv
-                    call venv\\Scripts\\activate.bat
-                    python -m pip install --upgrade pip
-                    python -m pip install -r requirements.txt
+                    
+                    echo "Обновление pip и установка пакетов..."
+                    venv\\Scripts\\python -m pip install --upgrade pip
+                    venv\\Scripts\\python -m pip install -r requirements.txt
                 '''
             }
         }
@@ -30,8 +31,7 @@ pipeline {
             steps {
                 bat '''
                     echo "Запуск тестов..."
-                    call venv\\Scripts\\activate.bat
-                    python -m pytest tests/ -v
+                    venv\\Scripts\\python -m pytest tests/ -v
                 '''
             }
         }
