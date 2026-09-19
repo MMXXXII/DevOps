@@ -19,7 +19,7 @@ def get_db():
 @app.get("/", response_class=HTMLResponse)
 def read_root(request: Request, db: Session = Depends(get_db)):
     items = db.query(models.Item).all()
-    return templates.TemplateResponse("index.html", {"request": request, "items": items})
+    return templates.TemplateResponse(request, "index.html", {"items": items})
 
 @app.post("/items/")
 def create_item(name: str, price: float, category: str, stock: int, description: str = None, db: Session = Depends(get_db)):
