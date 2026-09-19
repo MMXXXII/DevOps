@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from uuid import uuid4
 
 client = TestClient(app)
 
@@ -123,10 +124,12 @@ def test_filter_by_price():
 
 
 def test_create_category():
+    category_name = f"TestCategory-{uuid4().hex}"
+
     response = client.post(
         "/categories/",
         params={
-            "name": "TestCategoryUnique",
+            "name": category_name,
             "description": "Test category"
         }
     )
