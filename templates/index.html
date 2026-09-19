@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CI/CD CRUD Dashboard</title>
+    <title>CRUD Dashboard</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -20,33 +19,59 @@
         }
 
         header h1 {
-            margin: 0 0 10px;
-        }
-
-        header p {
-            margin: 0;
+            margin: 0 0 8px;
         }
 
         main {
             margin: 30px 40px;
         }
 
-        .info {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-
-        .card {
+        .form-container {
             background: white;
-            padding: 20px;
+            padding: 25px;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-            flex: 1;
+            margin-bottom: 30px;
         }
 
-        .card h3 {
+        .form-container h2 {
             margin-top: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            border: none;
+            border-radius: 5px;
+            padding: 10px 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .add-button {
+            margin-top: 15px;
+            background: #198754;
+            color: white;
+        }
+
+        .cancel-button {
+            margin-top: 15px;
+            background: #6c757d;
+            color: white;
+            display: none;
         }
 
         table {
@@ -72,9 +97,15 @@
             background: #f8f9fa;
         }
 
-        .status {
-            color: #198754;
-            font-weight: bold;
+        .edit-button {
+            background: #ffc107;
+            color: #212529;
+            margin-right: 5px;
+        }
+
+        .delete-button {
+            background: #dc3545;
+            color: white;
         }
 
         .empty {
@@ -82,76 +113,294 @@
             padding: 30px;
         }
 
-        footer {
-            margin-top: 30px;
-            padding: 20px 40px;
-            background: #343a40;
-            color: white;
-            text-align: center;
+        .message {
+            margin-bottom: 20px;
+            padding: 12px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .success {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #842029;
+        }
+
+        @media (max-width: 800px) {
+            main {
+                margin: 20px;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 13px;
+            }
         }
     </style>
 </head>
 <body>
 
 <header>
-    <h1>Панель управления CI/CD CRUD</h1>
-    <p>FastAPI + SQLAlchemy + SQLite + Jenkins</p>
+    <h1>Панель управления товарами</h1>
+    <p>FastAPI + SQLAlchemy + SQLite</p>
 </header>
 
 <main>
 
-    <div class="info">
-        <div class="card">
-            <h3>Статус приложения</h3>
-            <p class="status">Приложение работает</p>
+    <div id="message" class="message"></div>
+
+    <div class="form-container">
+        <h2 id="form-title">Добавить товар</h2>
+
+        <div class="form-grid">
+            <input id="name" type="text" placeholder="Название товара">
+            <input id="category" type="text" placeholder="Категория">
+            <input id="price" type="number" step="0.01" placeholder="Цена">
+            <input id="stock" type="number" placeholder="Количество">
+            <input id="description" type="text" placeholder="Описание">
         </div>
 
-        <div class="card">
-            <h3>CI/CD</h3>
-            <p class="status">Сборка выполнена через Jenkins</p>
-        </div>
+        <button class="add-button" id="submit-button" onclick="saveItem()">
+            Добавить товар
+        </button>
 
-        <div class="card">
-            <h3>База данных</h3>
-            <p>SQLite + SQLAlchemy</p>
-        </div>
+        <button class="cancel-button" id="cancel-button" onclick="cancelEdit()">
+            Отмена
+        </button>
     </div>
 
     <h2>Товары</h2>
 
     <table>
-        <tr>
-            <th>ID</th>
-            <th>Название</th>
-            <th>Категория</th>
-            <th>Цена</th>
-            <th>Остаток</th>
-            <th>Описание</th>
-        </tr>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Название</th>
+                <th>Категория</th>
+                <th>Цена</th>
+                <th>Остаток</th>
+                <th>Описание</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
 
-        {% for item in items %}
-        <tr>
-            <td>{{ item.id }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.category }}</td>
-            <td>{{ item.price }}</td>
-            <td>{{ item.stock }}</td>
-            <td>{{ item.description or "—" }}</td>
-        </tr>
-        {% else %}
-        <tr>
-            <td colspan="6" class="empty">
-                Товары отсутствуют
-            </td>
-        </tr>
-        {% endfor %}
+        <tbody id="items-table">
+        </tbody>
     </table>
 
 </main>
 
-<footer>
-    Лабораторная работа №1 — Методология CI/CD
-</footer>
+<script>
+    let editingId = null;
+
+    async function loadItems() {
+        try {
+            const response = await fetch("/items/");
+            const items = await response.json();
+
+            const table = document.getElementById("items-table");
+
+            if (!items.length) {
+                table.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="empty">
+                            Товары отсутствуют
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            table.innerHTML = items.map(item => `
+                <tr>
+                    <td>${item.id}</td>
+                    <td>${escapeHtml(item.name)}</td>
+                    <td>${escapeHtml(item.category)}</td>
+                    <td>${item.price}</td>
+                    <td>${item.stock}</td>
+                    <td>${escapeHtml(item.description || "—")}</td>
+                    <td>
+                        <button class="edit-button" onclick="editItem(${item.id})">
+                            Редактировать
+                        </button>
+
+                        <button class="delete-button" onclick="deleteItem(${item.id})">
+                            Удалить
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
+        } catch (error) {
+            showMessage("Ошибка загрузки товаров", false);
+        }
+    }
+
+    async function saveItem() {
+        const name = document.getElementById("name").value;
+        const category = document.getElementById("category").value;
+        const price = document.getElementById("price").value;
+        const stock = document.getElementById("stock").value;
+        const description = document.getElementById("description").value;
+
+        if (!name || !category || !price || stock === "") {
+            showMessage("Заполните обязательные поля", false);
+            return;
+        }
+
+        try {
+            let response;
+
+            if (editingId === null) {
+                const params = new URLSearchParams({
+                    name: name,
+                    description: description,
+                    price: price,
+                    category: category,
+                    stock: stock
+                });
+
+                response = await fetch(`/items/?${params.toString()}`, {
+                    method: "POST"
+                });
+            } else {
+                const params = new URLSearchParams({
+                    name: name,
+                    description: description,
+                    price: price,
+                    category: category,
+                    stock: stock
+                });
+
+                response = await fetch(`/items/${editingId}?${params.toString()}`, {
+                    method: "PUT"
+                });
+            }
+
+            if (!response.ok) {
+                const error = await response.json();
+                showMessage(error.detail || "Ошибка операции", false);
+                return;
+            }
+
+            if (editingId === null) {
+                showMessage("Товар успешно добавлен", true);
+            } else {
+                showMessage("Товар успешно обновлён", true);
+            }
+
+            clearForm();
+            await loadItems();
+
+        } catch (error) {
+            showMessage("Ошибка соединения с сервером", false);
+        }
+    }
+
+    async function editItem(id) {
+        try {
+            const response = await fetch(`/items/${id}`);
+
+            if (!response.ok) {
+                showMessage("Товар не найден", false);
+                return;
+            }
+
+            const item = await response.json();
+
+            document.getElementById("name").value = item.name;
+            document.getElementById("category").value = item.category;
+            document.getElementById("price").value = item.price;
+            document.getElementById("stock").value = item.stock;
+            document.getElementById("description").value = item.description || "";
+
+            editingId = id;
+
+            document.getElementById("form-title").textContent = "Редактировать товар";
+            document.getElementById("submit-button").textContent = "Сохранить изменения";
+            document.getElementById("cancel-button").style.display = "inline-block";
+
+            window.scrollTo({
+                top: 0,
+                behavior: "smooth"
+            });
+
+        } catch (error) {
+            showMessage("Ошибка загрузки товара", false);
+        }
+    }
+
+    async function deleteItem(id) {
+        if (!confirm("Вы действительно хотите удалить этот товар?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/items/${id}`, {
+                method: "DELETE"
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                showMessage(error.detail || "Ошибка удаления", false);
+                return;
+            }
+
+            showMessage("Товар успешно удалён", true);
+            await loadItems();
+
+        } catch (error) {
+            showMessage("Ошибка соединения с сервером", false);
+        }
+    }
+
+    function cancelEdit() {
+        clearForm();
+    }
+
+    function clearForm() {
+        document.getElementById("name").value = "";
+        document.getElementById("category").value = "";
+        document.getElementById("price").value = "";
+        document.getElementById("stock").value = "";
+        document.getElementById("description").value = "";
+
+        editingId = null;
+
+        document.getElementById("form-title").textContent = "Добавить товар";
+        document.getElementById("submit-button").textContent = "Добавить товар";
+        document.getElementById("cancel-button").style.display = "none";
+    }
+
+    function showMessage(text, success) {
+        const message = document.getElementById("message");
+
+        message.textContent = text;
+        message.className = success
+            ? "message success"
+            : "message error";
+
+        message.style.display = "block";
+
+        setTimeout(() => {
+            message.style.display = "none";
+        }, 3000);
+    }
+
+    function escapeHtml(value) {
+        const div = document.createElement("div");
+        div.textContent = value;
+        return div.innerHTML;
+    }
+
+    loadItems();
+</script>
 
 </body>
 </html>
