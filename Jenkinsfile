@@ -18,7 +18,7 @@ pipeline {
                 bat '''
                     echo "Создание venv в workspace Jenkins..."
                     if exist venv rmdir /s /q venv
-                    "%PYTHON%" -m venv venv
+                    "C:\\Users\\perfi\\AppData\\Local\\Programs\\Python\\Python313\\python.exe" -m venv venv
                     
                     echo "Обновление pip и установка пакетов..."
                     venv\\Scripts\\python -m pip install --upgrade pip
