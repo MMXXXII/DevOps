@@ -24,6 +24,8 @@ pipeline {
                 powershell '''
                     git --version
                     & $env:PYTHON_EXE --version
+                    Write-Host "Ветка: $env:GIT_BRANCH"
+                    Write-Host "Multibranch-ветка: $env:BRANCH_NAME"
                 '''
             }
         }
@@ -63,7 +65,10 @@ pipeline {
 
         stage('Deploy') {
             when {
-                branch 'main'
+                expression {
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH?.replace('origin/', '')
+                    return currentBranch == 'main'
+                }
             }
 
             steps {
@@ -76,7 +81,10 @@ pipeline {
 
         stage('Health check') {
             when {
-                branch 'main'
+                expression {
+                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH?.replace('origin/', '')
+                    return currentBranch == 'main'
+                }
             }
 
             steps {
@@ -108,7 +116,6 @@ pipeline {
                 '''
             }
         }
-    }
 
     post {
         success {
