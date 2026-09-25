@@ -20,7 +20,12 @@ if (Test-Path $PidFile) {
         -Force `
         -ErrorAction SilentlyContinue
 
-    Remove-Item $PidFile -Force
+    Start-Sleep -Seconds 1
+
+    Remove-Item `
+        $PidFile `
+        -Force `
+        -ErrorAction SilentlyContinue
 }
 
 & robocopy `
@@ -33,27 +38,27 @@ if (Test-Path $PidFile) {
     /XF *.pyc *.db app.pid app.stdout.log app.stderr.log
 
 if ($LASTEXITCODE -ge 8) {
-    throw "Ошибка копирования файлов"
+    throw "File copy failed"
 }
 
 if (-not (Test-Path $PythonExe)) {
     & $env:PYTHON_EXE -m venv $VenvDir
 
     if ($LASTEXITCODE -ne 0) {
-        throw "Не удалось создать виртуальное окружение"
+        throw "Virtual environment creation failed"
     }
 }
 
 & $PythonExe -m pip install --upgrade pip
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Не удалось обновить pip"
+    throw "Pip upgrade failed"
 }
 
 & $PythonExe -m pip install -r "$DeployRoot\requirements.txt"
 
 if ($LASTEXITCODE -ne 0) {
-    throw "Не удалось установить зависимости"
+    throw "Dependency installation failed"
 }
 
 $env:JENKINS_NODE_COOKIE = "fastapi-app-service"
@@ -73,7 +78,7 @@ Start-Sleep -Seconds 2
 
 if ($Process.HasExited) {
     Get-Content $ErrorLog -ErrorAction SilentlyContinue
-    throw "Приложение не запустилось"
+    throw "Application startup failed"
 }
 
-Write-Host "Сайт запущен: http://127.0.0.1:$AppPort"
+Write-Host "Site started: http://127.0.0.1:$AppPort"
