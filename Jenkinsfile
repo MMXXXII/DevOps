@@ -2,73 +2,56 @@ pipeline {
     agent any
 
     environment {
-        PYTHON = 'C:\\Users\\perfi\\AppData\\Local\\Programs\\Python\\Python313\\python.exe'
-        DEPLOY_DIR = 'C:\\apps'
+        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+        DEPLOY_URL = "http://127.0.0.1:8000"
+        APP_PORT = "8000"
+    }
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: "10"))
     }
 
     stages {
-        stage('Получение кода') {
+        stage("Install dependencies & Test") {
             steps {
-                checkout scm
-            }
-        }
-
-        stage('Установка зависимостей') {
-            steps {
-                bat '''
-                    if exist venv rmdir /s /q venv
-                    "%PYTHON%" -m venv venv
-                    venv\\Scripts\\python.exe -m pip install --upgrade pip
-                    venv\\Scripts\\python.exe -m pip install -r requirements.txt
+                sh '''
+                    python3 -m venv .venv
+                    .venv/bin/python -m pip install --upgrade pip
+                    .venv/bin/python -m pip install -r requirements.txt
+                    .venv/bin/python -m pytest tests/
                 '''
             }
         }
 
-        stage('Запуск тестов') {
-            steps {
-                bat '''
-                    venv\\Scripts\\python.exe -m pytest tests/ -v
-                '''
-            }
-        }
-
-        stage('Деплой') {
+        stage("Deploy") {
             when {
-                expression {
-                    env.GIT_BRANCH?.endsWith('main') ||
-                    env.GIT_BRANCH?.endsWith('master')
-                }
+                branch "main"
             }
             steps {
-                bat '''
-                    if not exist "%DEPLOY_DIR%" mkdir "%DEPLOY_DIR%"
-
-                    robocopy . "%DEPLOY_DIR%" /E /XD .git venv __pycache__ .pytest_cache /XF app.db /NFL /NDL /NJH /NJS /NC /NS
-
-                    if errorlevel 8 exit /b %ERRORLEVEL%
-
-                    cd /d "%DEPLOY_DIR%"
-
-                    if not exist venv (
-                        "%PYTHON%" -m venv venv
-                    )
-
-                    venv\\Scripts\\python.exe -m pip install -r requirements.txt
-
-                    net stop FastAPI 2>nul
-
-                    net start FastAPI
+                sh '''
+                    chmod +x scripts/deploy.sh
+                    scripts/deploy.sh
                 '''
             }
         }
-    }
-
-    post {
-        success {
-            echo "Деплой успешно завершён"
-        }
-        failure {
-            echo "Сборка или деплой завершились ошибкой"
+        
+        stage("Health check") {
+            when {
+                branch "main"
+            }
+            steps {
+                sh '''
+                    for attempt in $(seq 1 15); do
+                        if curl --fail --silent "$DEPLOY_URL"; then
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+                    exit 1
+                '''
+            }
         }
     }
 }
