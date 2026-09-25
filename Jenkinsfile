@@ -108,7 +108,7 @@ pipeline {
                             }
                         }
                         catch {
-                            Write-Host "Попытка $Attempt: сайт пока недоступен"
+                            Write-Host "Attempt ${Attempt}: site is not available yet"
                         }
 
                         Start-Sleep -Seconds 2
