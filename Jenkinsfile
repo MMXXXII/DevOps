@@ -2,56 +2,120 @@ pipeline {
     agent any
 
     environment {
-        PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
-        DEPLOY_URL = "http://127.0.0.1:8000"
-        APP_PORT = "8000"
+        DEPLOY_ROOT = 'C:/JenkinsDeploy/my-fastapi'
+        DEPLOY_URL = 'http://127.0.0.1:8000'
+        APP_PORT = '8000'
+    }
+
+    triggers {
+        githubPush()
     }
 
     options {
         timestamps()
         disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: "10"))
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
     stages {
-        stage("Install dependencies & Test") {
+        stage('Check environment') {
             steps {
-                sh '''
-                    python3 -m venv .venv
-                    .venv/bin/python -m pip install --upgrade pip
-                    .venv/bin/python -m pip install -r requirements.txt
-                    .venv/bin/python -m pytest tests/
+                powershell '''
+                    git --version
+                    py -3 --version
                 '''
             }
         }
 
-        stage("Deploy") {
-            when {
-                branch "main"
-            }
+        stage('Install dependencies') {
             steps {
-                sh '''
-                    chmod +x scripts/deploy.sh
-                    scripts/deploy.sh
+                powershell '''
+                    $Python = ".venv/Scripts/python.exe"
+
+                    if (-not (Test-Path $Python)) {
+                        py -3 -m venv .venv
+                    }
+
+                    & $Python -m pip install --upgrade pip
+
+                    if ($LASTEXITCODE -ne 0) {
+                        exit $LASTEXITCODE
+                    }
+
+                    & $Python -m pip install -r requirements.txt
+
+                    if ($LASTEXITCODE -ne 0) {
+                        exit $LASTEXITCODE
+                    }
                 '''
             }
         }
-        
-        stage("Health check") {
-            when {
-                branch "main"
-            }
+
+        stage('Tests') {
             steps {
-                sh '''
-                    for attempt in $(seq 1 15); do
-                        if curl --fail --silent "$DEPLOY_URL"; then
-                            exit 0
-                        fi
-                        sleep 2
-                    done
-                    exit 1
+                powershell '''
+                    & ".venv/Scripts/python.exe" -m pytest tests/
+                    exit $LASTEXITCODE
                 '''
             }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                powershell '''
+                    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+                    & "./scripts/deploy.ps1"
+                '''
+            }
+        }
+
+        stage('Health check') {
+            when {
+                branch 'main'
+            }
+
+            steps {
+                powershell '''
+                    $Success = $false
+
+                    for ($Attempt = 1; $Attempt -le 15; $Attempt++) {
+                        try {
+                            $Response = Invoke-WebRequest `
+                                -Uri $env:DEPLOY_URL `
+                                -UseBasicParsing `
+                                -TimeoutSec 3
+
+                            if ($Response.StatusCode -eq 200) {
+                                $Success = $true
+                                break
+                            }
+                        }
+                        catch {
+                            Start-Sleep -Seconds 2
+                        }
+                    }
+
+                    if (-not $Success) {
+                        throw "Сайт не запустился"
+                    }
+
+                    Write-Host "Сайт успешно развёрнут"
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline завершён успешно'
+        }
+
+        failure {
+            echo 'Pipeline завершился с ошибкой'
         }
     }
 }
