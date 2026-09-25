@@ -2,11 +2,11 @@ pipeline {
     agent any
 
     environment {
-    PYTHON_EXE = 'C:/Users/perfi/AppData/Local/Programs/Python/Python313/python.exe'
-    DEPLOY_ROOT = 'C:/JenkinsDeploy/my-fastapi'
-    DEPLOY_URL = 'http://127.0.0.1:8000'
-    APP_PORT = '8000'
-}
+        PYTHON_EXE = 'C:/Users/perfi/AppData/Local/Programs/Python/Python313/python.exe'
+        DEPLOY_ROOT = 'C:/JenkinsDeploy/my-fastapi'
+        DEPLOY_URL = 'http://127.0.0.1:8000'
+        APP_PORT = '8000'
+    }
 
     triggers {
         githubPush()
@@ -24,8 +24,8 @@ pipeline {
                 powershell '''
                     git --version
                     & $env:PYTHON_EXE --version
-                    Write-Host "Ветка: $env:GIT_BRANCH"
-                    Write-Host "Multibranch-ветка: $env:BRANCH_NAME"
+                    Write-Host "GIT_BRANCH: $env:GIT_BRANCH"
+                    Write-Host "BRANCH_NAME: $env:BRANCH_NAME"
                 '''
             }
         }
@@ -37,6 +37,10 @@ pipeline {
 
                     if (-not (Test-Path $Python)) {
                         & $env:PYTHON_EXE -m venv .venv
+
+                        if ($LASTEXITCODE -ne 0) {
+                            exit $LASTEXITCODE
+                        }
                     }
 
                     & $Python -m pip install --upgrade pip
@@ -66,8 +70,8 @@ pipeline {
         stage('Deploy') {
             when {
                 expression {
-                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH?.replace('origin/', '')
-                    return currentBranch == 'main'
+                    env.BRANCH_NAME == 'main' ||
+                    env.GIT_BRANCH == 'origin/main'
                 }
             }
 
@@ -82,8 +86,8 @@ pipeline {
         stage('Health check') {
             when {
                 expression {
-                    def currentBranch = env.BRANCH_NAME ?: env.GIT_BRANCH?.replace('origin/', '')
-                    return currentBranch == 'main'
+                    env.BRANCH_NAME == 'main' ||
+                    env.GIT_BRANCH == 'origin/main'
                 }
             }
 
@@ -104,8 +108,10 @@ pipeline {
                             }
                         }
                         catch {
-                            Start-Sleep -Seconds 2
+                            Write-Host "Попытка $Attempt: сайт пока недоступен"
                         }
+
+                        Start-Sleep -Seconds 2
                     }
 
                     if (-not $Success) {
@@ -116,6 +122,7 @@ pipeline {
                 '''
             }
         }
+    }
 
     post {
         success {
