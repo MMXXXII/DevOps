@@ -2,10 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_ROOT = 'C:/JenkinsDeploy/my-fastapi'
-        DEPLOY_URL = 'http://127.0.0.1:8000'
-        APP_PORT = '8000'
-    }
+    PYTHON_EXE = 'C:/Users/perfi/AppData/Local/Programs/Python/Python313/python.exe'
+    DEPLOY_ROOT = 'C:/JenkinsDeploy/my-fastapi'
+    DEPLOY_URL = 'http://127.0.0.1:8000'
+    APP_PORT = '8000'
+}
 
     triggers {
         githubPush()
@@ -22,7 +23,7 @@ pipeline {
             steps {
                 powershell '''
                     git --version
-                    py -3 --version
+                    & $env:PYTHON_EXE --version
                 '''
             }
         }
@@ -33,7 +34,7 @@ pipeline {
                     $Python = ".venv/Scripts/python.exe"
 
                     if (-not (Test-Path $Python)) {
-                        py -3 -m venv .venv
+                        & $env:PYTHON_EXE -m venv .venv
                     }
 
                     & $Python -m pip install --upgrade pip

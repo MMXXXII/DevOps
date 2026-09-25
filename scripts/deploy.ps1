@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ge 8) {
 }
 
 if (-not (Test-Path $PythonExe)) {
-    & py -3 -m venv $VenvDir
+    & $env:PYTHON_EXE -m venv $VenvDir
 
     if ($LASTEXITCODE -ne 0) {
         throw "Не удалось создать виртуальное окружение"
