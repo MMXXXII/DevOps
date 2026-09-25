@@ -9,6 +9,7 @@ $PythonExe = Join-Path $VenvDir "Scripts\python.exe"
 $PidFile = Join-Path $DeployRoot "app.pid"
 $OutputLog = Join-Path $DeployRoot "app.stdout.log"
 $ErrorLog = Join-Path $DeployRoot "app.stderr.log"
+$LauncherPath = Join-Path $DeployRoot "start-app.vbs"
 
 New-Item -ItemType Directory -Force -Path $DeployRoot | Out-Null
 
@@ -28,11 +29,13 @@ if (Test-Path $PidFile) {
         -ErrorAction SilentlyContinue
 }
 
-$PortProcesses = Get-NetTCPConnection `
-    -LocalPort $AppPort `
-    -State Listen `
-    -ErrorAction SilentlyContinue |
-    Select-Object -ExpandProperty OwningProcess -Unique
+$PortProcesses = @(
+    Get-NetTCPConnection `
+        -LocalPort $AppPort `
+        -State Listen `
+        -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty OwningProcess -Unique
+)
 
 foreach ($PortProcessId in $PortProcesses) {
     Stop-Process `
@@ -81,27 +84,46 @@ if ($LASTEXITCODE -ne 0) {
     throw "Dependency installation failed"
 }
 
-$env:JENKINS_NODE_COOKIE = "fastapi-app-service"
+Remove-Item `
+    $OutputLog, $ErrorLog `
+    -Force `
+    -ErrorAction SilentlyContinue
 
-$Process = Start-Process `
-    -FilePath $PythonExe `
-    -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", $AppPort `
-    -WorkingDirectory $DeployRoot `
-    -RedirectStandardOutput $OutputLog `
-    -RedirectStandardError $ErrorLog `
-    -WindowStyle Hidden `
-    -PassThru
+$LauncherContent = @'
+Set shell = CreateObject("WScript.Shell")
+pythonExe = WScript.Arguments(0)
+workDir = WScript.Arguments(1)
+port = WScript.Arguments(2)
+outputLog = WScript.Arguments(3)
+errorLog = WScript.Arguments(4)
+shell.CurrentDirectory = workDir
+shell.Environment("Process")("JENKINS_NODE_COOKIE") = "fastapi-app-service"
+command = "cmd.exe /c " & pythonExe & " -m uvicorn app.main:app --host 127.0.0.1 --port " & port & " 1>>" & outputLog & " 2>>" & errorLog
+shell.Run command, 0, False
+'@
 
-$Process.Id | Set-Content $PidFile
+Set-Content `
+    -Path $LauncherPath `
+    -Value $LauncherContent `
+    -Encoding ASCII
+
+& cscript.exe `
+    //NoLogo `
+    $LauncherPath `
+    $PythonExe `
+    $DeployRoot `
+    $AppPort `
+    $OutputLog `
+    $ErrorLog
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Detached startup failed"
+}
 
 $Started = $false
 
-for ($Attempt = 1; $Attempt -le 10; $Attempt++) {
+for ($Attempt = 1; $Attempt -le 15; $Attempt++) {
     Start-Sleep -Seconds 1
-
-    if ($Process.HasExited) {
-        break
-    }
 
     try {
         $Response = Invoke-WebRequest `
@@ -125,5 +147,12 @@ if (-not $Started) {
 
     throw "Application startup failed"
 }
+
+$NewProcessId = Get-NetTCPConnection `
+    -LocalPort $AppPort `
+    -State Listen |
+    Select-Object -First 1 -ExpandProperty OwningProcess
+
+$NewProcessId | Set-Content $PidFile
 
 Write-Host "Site started: http://127.0.0.1:$AppPort"
