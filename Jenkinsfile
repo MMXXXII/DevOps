@@ -35,7 +35,6 @@ pipeline {
                         env.APP_ENV = 'dev'
                         env.HTTP_PORT = '8101'
                     } else {
-                        // feature/* и прочие ветки: только тесты и сборка образов, без деплоя
                         env.DEPLOY_ENABLED = 'false'
                         env.APP_ENV = 'ci'
                         env.HTTP_PORT = '8190'
@@ -44,7 +43,10 @@ pipeline {
                     env.COMPOSE_PROJECT_NAME = "my-fastapi-${env.APP_ENV}"
                     env.DEPLOY_URL = "http://127.0.0.1:${env.HTTP_PORT}"
 
-                    echo "Branch: ${env.BRANCH}, env: ${env.APP_ENV}, deploy: ${env.DEPLOY_ENABLED}, url: ${env.DEPLOY_URL}"
+                    def safeBranch = env.BRANCH.replaceAll('[^A-Za-z0-9_.-]', '-')
+                    env.IMAGE_TAG = "${safeBranch}-${env.BUILD_NUMBER}"
+
+                    echo "Branch: ${env.BRANCH}, env: ${env.APP_ENV}, deploy: ${env.DEPLOY_ENABLED}, url: ${env.DEPLOY_URL}, image tag: ${env.IMAGE_TAG}"
                 }
             }
         }
@@ -66,6 +68,38 @@ pipeline {
                     # Проверка, что Jenkins видит Docker-демон
                     docker info --format "Docker server: {{.ServerVersion}}"
                     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+                '''
+            }
+        }
+
+        stage('Start registry') {
+            steps {
+                powershell '''
+                    $ErrorActionPreference = 'Continue'
+
+                    $exists = docker ps -a --filter "name=^registry$" --format "{{.Names}}"
+
+                    if (-not $exists) {
+                        docker run -d --restart=always -p 5000:5000 -v registry_data:/var/lib/registry --name registry registry:2
+                    } else {
+                        docker start registry | Out-Null
+                    }
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+                    $Ready = $false
+                    for ($Attempt = 1; $Attempt -le 15; $Attempt++) {
+                        try {
+                            $r = Invoke-WebRequest -Uri "http://localhost:5000/v2/" -UseBasicParsing -TimeoutSec 3
+                            if ($r.StatusCode -eq 200) { $Ready = $true; break }
+                        }
+                        catch {
+                            Write-Host "Attempt ${Attempt}: registry is not ready yet"
+                        }
+                        Start-Sleep -Seconds 2
+                    }
+
+                    if (-not $Ready) { throw "Registry did not start on localhost:5000" }
+                    Write-Host "Registry is up on localhost:5000"
                 '''
             }
         }
@@ -118,7 +152,22 @@ pipeline {
                     docker compose build --progress=plain
                     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-                    docker images --filter "reference=$($env:COMPOSE_PROJECT_NAME)-*"
+                    docker images "localhost:5000/*"
+                '''
+            }
+        }
+
+        stage('Push to registry') {
+            steps {
+                powershell '''
+                    $ErrorActionPreference = 'Continue'
+
+                    docker compose push
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+                    Write-Host "Images in registry:"
+                    Invoke-RestMethod -Uri "http://localhost:5000/v2/_catalog" | ConvertTo-Json -Compress
+                    Invoke-RestMethod -Uri "http://localhost:5000/v2/my-fastapi-app/tags/list" | ConvertTo-Json -Compress
                 '''
             }
         }
@@ -132,7 +181,11 @@ pipeline {
                 powershell '''
                     $ErrorActionPreference = 'Continue'
 
-                    docker compose up -d --build --remove-orphans
+                    # Образы берутся из локального registry
+                    docker compose pull
+                    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+                    docker compose up -d --remove-orphans
                     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
                     docker compose ps
