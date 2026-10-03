@@ -1,5 +1,6 @@
 services:
   app:
+    image: localhost:5000/my-fastapi-app:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -25,6 +26,7 @@ services:
       start_period: 10s
 
   nginx:
+    image: localhost:5000/my-fastapi-nginx:${IMAGE_TAG:-latest}
     build:
       context: ./nginx
     ports:
