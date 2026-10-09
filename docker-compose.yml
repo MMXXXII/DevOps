@@ -1,46 +1,28 @@
+
 services:
   app:
     image: localhost:5000/my-fastapi-app:${IMAGE_TAG:-latest}
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     environment:
-      APP_MODULE: app.main:app
       DATABASE_URL: sqlite:////data/app.db
-    expose:
-      - "8000"
     volumes:
       - app_data:/data
     restart: unless-stopped
-    networks:
-      - backend
     healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/', timeout=3).status == 200 else 1)"
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/', timeout=3)"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
   nginx:
     image: localhost:5000/my-fastapi-nginx:${IMAGE_TAG:-latest}
-    build:
-      context: ./nginx
+    build: ./nginx
     ports:
-      - "${HTTP_PORT:-8100}:80"
+      - "8100:80"
     depends_on:
       app:
         condition: service_healthy
     restart: unless-stopped
-    networks:
-      - backend
 
 volumes:
   app_data:
-
-networks:
-  backend:
-    driver: bridge
