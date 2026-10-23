@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: categories
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: categories
+  template:
+    metadata:
+      labels:
+        app: categories
+    spec:
+      containers:
+        - name: categories
+          image: localhost:5000/shop-app:v2
+          command: ["uvicorn", "app.categories_service:app", "--host", "0.0.0.0", "--port", "8000"]
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+            - name: DATABASE_URL
+              value: postgresql+psycopg2://shop:$(DB_PASSWORD)@postgres:5432/shop
+            - name: ITEMS_SERVICE_URL
+              value: http://items:8000
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /categories/count
+              port: 8000
+          livenessProbe:
+            tcpSocket:
+              port: 8000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: categories
+spec:
+  selector:
+    app: categories
+  ports:
+    - port: 8000
